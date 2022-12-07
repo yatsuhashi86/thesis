@@ -4,12 +4,12 @@ import kotlin.math.min
 
 data class Position(val departure: Pair<Int, Int>, val destination: Pair<Int, Int>)
 
-class Demand(private val numberOfBus: Int, private val standardValue: Int, private val timeToBePatient: Int){
+class Demand(private val numberOfBus: Int, private val standardValue: Int){
 
-    val busInfoOfPosition = MutableList(numberOfBus){ MutableList(10){ -1 } }
+    private val busInfoOfPosition = MutableList(numberOfBus){ MutableList(10){ -1 } }
     //[現在地のｘ座標、現在地のｙ座標、一人目のｘ座標、一人目のｙ座標・・・]
     //なぜpositionクラスを使わなかったのか・・・非常に悔やまれるし絶対書き換えた方がいい
-    val busInfoOfTime = MutableList(numberOfBus){ MutableList(5){ -1 } }
+    private val busInfoOfTime = MutableList(numberOfBus){ MutableList(5){ -1 } }
     //[一人目到着時間、・・・、総達成時間]
     var beforeTime = 0
     var cancelReservation = 0
@@ -28,7 +28,7 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int, priva
         return Position(departure, destination)
     }
 
-    fun travelingSalesman(currentTime: Int, departureAndDestination: Position){
+    fun travelingSalesman(currentTime: Int, departureAndDestination: Position, timeToBePatient: Int){
         val departure = departureAndDestination.departure
         val destination = departureAndDestination.destination
 
@@ -49,13 +49,14 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int, priva
             var beforeBusStop = Pair(busInfoOfPosition[i][0], busInfoOfPosition[i][1])
             for (j in 0 until 4){ //予約から予約までですでに運び終わった人がいるかどうか
                 if (busInfoOfTime[i][j] <= moved && busInfoOfTime[i][j] != -1){
-                    if (moved < busInfoOfTime[i][j]){
-                        moved -= busInfoOfTime[i][j]
-                        beforeBusStop = Pair(busInfoOfPosition[i][j*2+2], busInfoOfPosition[i][j*2+3])
-                    }
+                    moved -= busInfoOfTime[i][j]
+                    beforeBusStop = Pair(busInfoOfPosition[i][j*2+2], busInfoOfPosition[i][j*2+3])
                     busInfoOfTime[i][j] = -1
+                    busInfoOfPosition[i][0] = busInfoOfPosition[i][j*2+2]
+                    busInfoOfPosition[i][1] = busInfoOfPosition[i][j*2+3]
                     busInfoOfPosition[i][j*2+2] = -1
                     busInfoOfPosition[i][j*2+3] = -1
+
                 }
                 if (busInfoOfTime[i][j] != -1){
                     if (minOfDistance > busInfoOfTime[i][j]){
@@ -124,11 +125,11 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int, priva
                                     if (n == j || n == k || n == l || n == m) break
                                     val nowCost = distance[j][k] + distance[k][l] + distance[l][m] + distance[m][n] + distance[0][j]
                                     if (nowCost < cost){
-                                        busOrder[i][0] = j
-                                        busOrder[i][1] = k
-                                        busOrder[i][2] = l
-                                        busOrder[i][3] = m
-                                        busOrder[i][4] = n
+                                        busOrder[i][0] = j-1
+                                        busOrder[i][1] = k-1
+                                        busOrder[i][2] = l-1
+                                        busOrder[i][3] = m-1
+                                        busOrder[i][4] = n-1
                                     }
                                     cost = minOf(cost, nowCost) //これでi番目のバスが予約を受け持つときの一番早い行き方にかかる時間がわかった
 
@@ -148,10 +149,10 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int, priva
 
                                 val nowCost = distance[j][k] + distance[k][l] + distance[l][m] + distance[0][j]
                                 if (nowCost < cost){
-                                    busOrder[i][0] = j
-                                    busOrder[i][1] = k
-                                    busOrder[i][2] = l
-                                    busOrder[i][3] = m
+                                    busOrder[i][0] = j-1
+                                    busOrder[i][1] = k-1
+                                    busOrder[i][2] = l-1
+                                    busOrder[i][3] = m-1
                                 }
                                 cost = minOf(cost, nowCost) //これでi番目のバスが予約を受け持つときの一番早い行き方にかかる時間がわかった
                             }
@@ -166,9 +167,9 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int, priva
                             if (l == k || l == j) break
                             val nowCost = distance[j][k] + distance[k][l] + distance[0][j]
                             if (nowCost < cost){
-                                busOrder[i][0] = j
-                                busOrder[i][1] = k
-                                busOrder[i][2] = l
+                                busOrder[i][0] = j-1
+                                busOrder[i][1] = k-1
+                                busOrder[i][2] = l-1
                             }
                             cost = minOf(cost, nowCost) //これでi番目のバスが予約を受け持つときの一番早い行き方にかかる時間がわかった
                         }
@@ -192,7 +193,6 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int, priva
                 minOfTime = costList[i]
             }
         }
-        println(" ${indexOfMin}")
         //もし一番速いバスでも基準値より時間がかかる場合予約を拒否
         if (minOfTime < standardValue) {
             val trayTime = busInfoOfTime[indexOfMin]
@@ -209,10 +209,9 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int, priva
                 )
             }
             time += manhattan(busInfoOfPosition[indexOfMin][0] to busInfoOfPosition[indexOfMin][1], x)
-            println(time)
 
             for (i in 0 until 4) {
-                if (busOrder[indexOfMin][i+1] == -1) break
+                if (busOrder[indexOfMin][i+1] == -1) continue
                 x = when {
                     busOrder[indexOfMin][i] == 0 -> destination
                     busOrder[indexOfMin][i] == 1 -> departure
@@ -234,16 +233,16 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int, priva
                 if (busOrder[indexOfMin][i+1] >= 2){
                     busInfoOfTime[indexOfMin][busOrder[indexOfMin][i]-2] = time / 40
                 } else if (busOrder[indexOfMin][i+1] == 0){
+                    //同じバスに乗る場合ここに入れてない
                     for (j in 0 until 4) {
                         if (busInfoOfTime[indexOfMin][j] == -1) {
-                            if (time / 40 > timeToBePatient){
+                            if (time / 40 > timeToBePatient){ //ここで基準値より時間かかってるか判断
                                 cancelReservation++
                                 busInfoOfTime[indexOfMin] = trayTime
                             } else {
                                 busInfoOfTime[indexOfMin][j] = time / 40 //新規予約の達成時間
                                 busInfoOfPosition[indexOfMin][j * 2 + 2] = destination.first
                                 busInfoOfPosition[indexOfMin][j * 2 + 3] = destination.second
-                                println("  $j")
                             }
                             break
                         }
