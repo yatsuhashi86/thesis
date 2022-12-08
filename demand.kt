@@ -34,16 +34,14 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int){
 
         val costList = MutableList(numberOfBus){ 0 } //バスごとの新規予約を引き受けた時の総達成時間から引き受けなかった時の総達成時間を引いたもの
         val busOrder = MutableList(numberOfBus){ MutableList(5){-1} } // 予約達成順位を保存する配列
-
+        val fullHouse = mutableListOf<Int>()
         val timeCourse = currentTime - beforeTime //現在時刻から以前の予約の時刻を引いて何分たったか
         for (i in 0 until numberOfBus){
 
-            //↑6*6の、一行目と一列目が一人目に関する時間、二行目と二列目が二人目に関する。。。ってなる二次元配列5と6は新規の出発地、目的地
             val raiding = arrayListOf<Int>()
             //バスに人が乗ってるかどうかの判断（予約が入った時に時間が進む）と現在位置の更新
             //ここで到着予定時刻も更新しなければならない→busOrderを使う
             var minOfDistance = Int.MAX_VALUE
-
             var moved = timeCourse
             var nextMoved = -1
             var beforeBusStop = Pair(busInfoOfPosition[i][0], busInfoOfPosition[i][1])
@@ -90,6 +88,10 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int){
 
 
             val passengers = raiding.size
+            if (passengers >= 4) {
+                fullHouse.add(i)
+                continue
+            }
             val distance = MutableList(passengers+3){ MutableList(passengers+3){ Int.MAX_VALUE } }
 
             //バスに人が乗ってる場合、その人の目的地と新しく追加される人の出発地と目的地を合わせた全ての点間の距離を求める
@@ -108,13 +110,14 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int){
                         else -> (busInfoOfPosition[i][k*2-4] to busInfoOfPosition[i][k*2-3])
                     }
                     distance[j][k] = manhattan(distanceOne, distanceTwo)
+                    distance[k][j] = manhattan(distanceOne, distanceTwo)
                 }
             }
 
             //巡回セールスマン問題という名の全探索。本当に汚いコード。書き直し推奨。
             var cost = Int.MAX_VALUE
             if (passengers == 3){
-                for (j in 2 until passengers+3){ //jが一番最初に向かう目的地。0は新規予約の目的地なのでだめ
+                for (j in 2 until passengers+3){ //jが一番最初に向かう目的地。1は新規予約の目的地、0は現在地なのでだめ
                     for (k in 1 until passengers+3){
                         if (k == j) break
                         for (l in 1 until passengers+3){
@@ -180,14 +183,22 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int){
                 busOrder[i][0] = 1
                 busOrder[i][1] = 0
             }
+            if (busInfoOfTime[i][4] - timeCourse >= 0 && busInfoOfTime[i][4] != -1){
+                costList[i] = (cost / 40) - (busInfoOfTime[i][4] - timeCourse)
+            } else {
+                costList[i] = (cost / 40)
+            }
+
             busInfoOfTime[i][4] = -1
             busInfoOfTime[i][4] = busInfoOfTime[i].max()!!
-            costList[i] = cost / 40 - busInfoOfTime[i][4]
         }
         var minOfTime = Int.MAX_VALUE
         var indexOfMin = 0
         //以下にcostListの中で一番小さいものを選択してそのバスの情報を更新するのが必要
         for (i in 0 until numberOfBus){
+            if (fullHouse.contains(i)){
+                continue
+            }
             if (costList[i] < minOfTime){
                 indexOfMin = i //indexOfMinが選択されるバス
                 minOfTime = costList[i]
@@ -209,7 +220,6 @@ class Demand(private val numberOfBus: Int, private val standardValue: Int){
                 )
             }
             time += manhattan(busInfoOfPosition[indexOfMin][0] to busInfoOfPosition[indexOfMin][1], x)
-
             for (i in 0 until 4) {
                 if (busOrder[indexOfMin][i+1] == -1) continue
                 x = when {
